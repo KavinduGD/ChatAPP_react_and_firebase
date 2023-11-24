@@ -4,9 +4,11 @@ import { auth, db, storage } from "../firebase";
 import { useState } from "react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { doc, setDoc } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 
 function Register() {
   const [err, setErr] = useState(null);
+  const navigate = useNavigate();
   const handleSubmit = async (e) => {
     e.preventDefault();
     const displayName = e.target[0].value;
@@ -26,7 +28,6 @@ function Register() {
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
             console.log("File available at", downloadURL);
-            console.log("hitting here");
             await updateProfile(res.user, {
               displayName,
               photo: downloadURL,
@@ -38,11 +39,14 @@ function Register() {
               email,
               photoUrl: downloadURL,
             });
+
+            await setDoc(doc(db, "userChats", res.user.uid), {});
           });
         }
       );
 
       setErr(null);
+      navigate("/");
     } catch (error) {
       const errorMessage = error.message;
       setErr(error.message);
