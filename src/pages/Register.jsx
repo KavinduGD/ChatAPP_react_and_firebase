@@ -9,7 +9,10 @@ import { useNavigate } from "react-router-dom";
 function Register() {
   const [err, setErr] = useState(null);
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+
   const handleSubmit = async (e) => {
+    setLoading(true);
     e.preventDefault();
     const displayName = e.target[0].value;
     const email = e.target[1].value;
@@ -17,41 +20,46 @@ function Register() {
     const file = e.target[3].files[0];
 
     try {
+      //Create user
       const res = await createUserWithEmailAndPassword(auth, email, password);
-      const storageRef = ref(storage, displayName);
-      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      uploadTask.on(
-        (error) => {
-          setErr(error);
-        },
-        () => {
-          getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
-            console.log("File available at", downloadURL);
+      //Create a unique image name
+      const date = new Date().getTime();
+      const storageRef = ref(storage, `${displayName + date}`);
+
+      await uploadBytesResumable(storageRef, file).then(() => {
+        getDownloadURL(storageRef).then(async (downloadURL) => {
+          try {
+            //Update profile
             await updateProfile(res.user, {
               displayName,
-              photo: downloadURL,
+              photoURL: downloadURL,
             });
-            console.log("hitting here");
+
+            //create user on firestore
             await setDoc(doc(db, "users", res.user.uid), {
               uid: res.user.uid,
               displayName,
               email,
-              photoUrl: downloadURL,
+              photoURL: downloadURL,
             });
 
+            //create empty user chats on firestore
             await setDoc(doc(db, "userChats", res.user.uid), {});
-          });
-        }
-      );
-
-      setErr(null);
-      navigate("/");
-    } catch (error) {
-      const errorMessage = error.message;
-      setErr(error.message);
+            navigate("/");
+          } catch (err) {
+            console.log(err);
+            setErr(true);
+            setLoading(false);
+          }
+        });
+      });
+    } catch (err) {
+      setErr(true);
+      setLoading(false);
     }
   };
+
   return (
     <div className="formContainer">
       <div className="formWrapper">
@@ -73,7 +81,14 @@ function Register() {
             </p>
           )}
         </form>
-        <p>You do have an account? Login</p>
+        <p
+          style={{ cursor: "pointer" }}
+          onClick={() => {
+            navigate("/");
+          }}
+        >
+          You do have an account? Login
+        </p>
       </div>
     </div>
   );
